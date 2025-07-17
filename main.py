@@ -1,42 +1,41 @@
+# main.py
+
 import os
 import logging
-import requests
+from io import BytesIO
+from rembg import remove
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-TELEGRAM_API_TOKEN = os.getenv('TELEGRAM_API_TOKEN')
-BG_REMOVER_API_KEY = os.getenv('BG_REMOVER_API_KEY')
+# Get token from environment variable
+TELEGRAM_API_TOKEN = os.environ.get("TELEGRAM_API_TOKEN")
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+# Enable logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+# Start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Send me a photo, and I’ll remove its background!")
+    await update.message.reply_text("Send me a photo, and I’ll remove the background for you!")
 
+# Handle photo messages
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    photo_file = await update.message.photo[-1].get_file()
-    image_bytes = await photo_file.download_as_bytearray()
+    photo = await update.message.photo[-1].get_file()
+    photo_bytes = await photo.download_as_bytearray()
 
-    response = requests.post(
-        'https://api.remove.bg/v1.0/removebg',
-        files={'image_file': image_bytes},
-        data={'size': 'auto'},
-        headers={'X-Api-Key': BG_REMOVER_API_KEY},
-    )
+    input_image = BytesIO(photo_bytes)
+    output_image = remove(input_image)
 
-    if response.status_code == 200:
-        await update.message.reply_photo(photo=response.content)
-    else:
-        await update.message.reply_text("Failed to remove background. Try again later.")
+    await update.message.reply_photo(photo=BytesIO(output_image), caption="Here is your image without background!")
 
-if __name__ == '__main__':
+# Main bot app
+def main():
     app = ApplicationBuilder().token(TELEGRAM_API_TOKEN).build()
 
-    app.add_handler(CommandHandler('start', start))
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
-    print("Bot running...")
     app.run_polling()
 
+if __name__ == "__main__":
+    main()
