@@ -6,4 +6,4 @@ services:
     startCommand: python main.py
     envVars:
       - key: TELEGRAM_API_TOKEN
-        value: your-token-here
+        value:
