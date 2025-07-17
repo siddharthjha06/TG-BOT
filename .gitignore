@@ -1,3 +1,10 @@
 __pycache__/
-*.pyc
 .env
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+build/
+dist/
