@@ -5,31 +5,39 @@ from rembg import remove
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
-# Set up logging
+# Logging setup
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Get your Telegram bot token from environment variable
+# Get token from environment variable
 TELEGRAM_API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
 
-# Handler for incoming photo messages
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    photo_file = await update.message.photo[-1].get_file()
-    photo_bytes = await photo_file.download_as_bytearray()
-    input_image = BytesIO(photo_bytes)
+    try:
+        logger.info("Received photo")
+        photo_file = await update.message.photo[-1].get_file()
+        logger.info(f"File path: {photo_file.file_path}")
+        photo_bytes = BytesIO()
+        await photo_file.download_to_memory(out=photo_bytes)
+        photo_bytes.seek(0)
 
-    # ✅ Fixed: Force return bytes from rembg
-    output_image = remove(input_image, force_return_bytes=True)
+        # Remove background
+        output_bytes = remove(photo_bytes.getvalue(), force_return_bytes=True)
+        logger.info("Background removed successfully")
 
-    # Send processed image back
-    await update.message.reply_photo(photo=BytesIO(output_image))
+        # Send the result
+        await update.message.reply_photo(photo=BytesIO(output_bytes))
+        logger.info("Replied with processed image")
+
+    except Exception as e:
+        logger.error(f"Error in handle_photo: {e}")
+        await update.message.reply_text("An error occurred while processing the image.")
 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_API_TOKEN).build()
-
-    # Add handler for photo
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-
+    logger.info("Bot started")
     app.run_polling()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
