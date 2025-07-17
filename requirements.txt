@@ -1,3 +1,2 @@
-python-telegram-bot==20.7
-rembg==2.0.51
-numpy<2
+python-telegram-bot==20.3
+requests
