@@ -1,9 +1,9 @@
 services:
   - type: worker
-    name: telegram-bg-bot
-    runtime: python
+    name: telegram-bot
+    env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
     envVars:
       - key: TELEGRAM_API_TOKEN
-        value: your_bot_token_here  # or use Render's dashboard to set securely
+        value: your-token-here
