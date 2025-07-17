@@ -3,34 +3,32 @@ import logging
 from io import BytesIO
 from rembg import remove
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
-# Get token from environment variable
-TELEGRAM_API_TOKEN = os.environ.get("TELEGRAM_API_TOKEN")
-
-# Enable logging
+# Set up logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-# /start command
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Send me a photo and I will remove the background!")
+# Get your Telegram bot token from environment variable
+TELEGRAM_API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
 
-# Handle photo
+# Handler for incoming photo messages
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    photo = await update.message.photo[-1].get_file()
-    photo_bytes = await photo.download_as_bytearray()
-
+    photo_file = await update.message.photo[-1].get_file()
+    photo_bytes = await photo_file.download_as_bytearray()
     input_image = BytesIO(photo_bytes)
-    output_image = remove(input_image)
 
-    await update.message.reply_photo(photo=BytesIO(output_image), caption="✅ Background removed!")
+    # ✅ Fixed: Force return bytes from rembg
+    output_image = remove(input_image, force_return_bytes=True)
 
-# Main function
+    # Send processed image back
+    await update.message.reply_photo(photo=BytesIO(output_image))
+
 def main():
     app = ApplicationBuilder().token(TELEGRAM_API_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
+
+    # Add handler for photo
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+
     app.run_polling()
 
 if __name__ == "__main__":
