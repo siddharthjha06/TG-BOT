@@ -1,42 +1,50 @@
-import os
 import logging
-from io import BytesIO
-from rembg import remove
+import requests
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-# Logging setup
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+TELEGRAM_API_TOKEN = 'YOUR_TELEGRAM_BOT_TOKEN'
+BG_REMOVER_API_KEY = 'YOUR_REMOVE_BG_API_KEY'
 
-# Get token from environment variable
-TELEGRAM_API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
+# Enable logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Send me a photo, and I’ll remove its background!")
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        logger.info("Received photo")
         photo_file = await update.message.photo[-1].get_file()
-        logger.info(f"File path: {photo_file.file_path}")
-        photo_bytes = BytesIO()
-        await photo_file.download_to_memory(out=photo_bytes)
-        photo_bytes.seek(0)
+        image_bytes_io = await photo_file.download_as_bytes()
 
-        # Remove background
-        output_bytes = remove(photo_bytes.getvalue(), force_return_bytes=True)
-        logger.info("Background removed successfully")
+        # Call background remover API
+        response = requests.post(
+            'https://api.remove.bg/v1.0/removebg',
+            files={'image_file': ('image.jpg', image_bytes_io)},
+            data={'size': 'auto'},
+            headers={'X-Api-Key': BG_REMOVER_API_KEY},
+        )
 
-        # Send the result
-        await update.message.reply_photo(photo=BytesIO(output_bytes))
-        logger.info("Replied with processed image")
-
+        if response.status_code == 200:
+            await update.message.reply_photo(photo=response.content)
+        else:
+            await update.message.reply_text(
+                f"❌ Failed to remove background. Error: {response.status_code} - {response.text}"
+            )
     except Exception as e:
-        logger.error(f"Error in handle_photo: {e}")
-        await update.message.reply_text("An error occurred while processing the image.")
+        logging.error(f"Error in handle_photo: {e}")
+        await update.message.reply_text("⚠️ An error occurred while processing your image.")
 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_API_TOKEN).build()
+
+    app.add_handler(CommandHandler('start', start))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    logger.info("Bot started")
+
+    print("✅ Bot is running...")
     app.run_polling()
 
 if __name__ == '__main__':
